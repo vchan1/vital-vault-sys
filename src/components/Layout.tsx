@@ -1,8 +1,10 @@
 import { ReactNode } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Activity, Users, Calendar, FileText, DollarSign, Pill, Home, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface LayoutProps {
   children: ReactNode;
@@ -20,6 +22,17 @@ const navigation = [
 
 export default function Layout({ children }: LayoutProps) {
   const location = useLocation();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      toast.error("Error logging out");
+    } else {
+      toast.success("Logged out successfully");
+      navigate("/auth");
+    }
+  };
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -57,7 +70,11 @@ export default function Layout({ children }: LayoutProps) {
         </div>
 
         <div className="absolute bottom-0 w-64 p-6 border-t border-sidebar-border">
-          <Button variant="ghost" className="w-full justify-start gap-3 text-sidebar-foreground hover:bg-sidebar-accent">
+          <Button 
+            variant="ghost" 
+            className="w-full justify-start gap-3 text-sidebar-foreground hover:bg-sidebar-accent"
+            onClick={handleLogout}
+          >
             <LogOut className="h-5 w-5" />
             Logout
           </Button>

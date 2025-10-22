@@ -1,7 +1,7 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { useEffect, useState } from "react";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, User } from "lucide-react";
+import { Search, User } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -10,13 +10,71 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import AddPatientDialog from "@/components/AddPatientDialog";
+
+interface Patient {
+  patient_id: string;
+  dob: string;
+  gender: string;
+  phone: string | null;
+  address: string | null;
+  profiles: {
+    name: string;
+    email: string;
+  };
+}
 
 export default function Patients() {
-  const patients = [
-    { id: "P001", name: "John Doe", age: 45, gender: "Male", phone: "(555) 123-4567", lastVisit: "2024-10-15" },
-    { id: "P002", name: "Jane Smith", age: 32, gender: "Female", phone: "(555) 234-5678", lastVisit: "2024-10-18" },
-    { id: "P003", name: "Bob Johnson", age: 58, gender: "Male", phone: "(555) 345-6789", lastVisit: "2024-10-20" },
-  ];
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchPatients = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("patients")
+        .select(`
+          patient_id,
+          dob,
+          gender,
+          phone,
+          address,
+          profiles!inner(name, email)
+        `)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      setPatients(data || []);
+    } catch (error: any) {
+      toast.error("Error fetching patients");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPatients();
+  }, []);
+
+  const calculateAge = (dob: string) => {
+    const birthDate = new Date(dob);
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    return age;
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -25,10 +83,7 @@ export default function Patients() {
           <h1 className="text-4xl font-bold text-foreground mb-2">Patients</h1>
           <p className="text-muted-foreground">Manage patient records and information</p>
         </div>
-        <Button className="gap-2">
-          <Plus className="h-4 w-4" />
-          Add Patient
-        </Button>
+        <AddPatientDialog onSuccess={fetchPatients} />
       </div>
 
       <Card className="shadow-card">
@@ -54,26 +109,36 @@ export default function Patients() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {patients.map((patient) => (
-                <TableRow key={patient.id}>
-                  <TableCell className="font-medium">{patient.id}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-                        <User className="h-4 w-4 text-primary" />
-                      </div>
-                      {patient.name}
-                    </div>
-                  </TableCell>
-                  <TableCell>{patient.age}</TableCell>
-                  <TableCell>{patient.gender}</TableCell>
-                  <TableCell>{patient.phone}</TableCell>
-                  <TableCell>{patient.lastVisit}</TableCell>
-                  <TableCell>
-                    <Button variant="ghost" size="sm">View</Button>
+              {patients.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                    No patients found. Add your first patient to get started.
                   </TableCell>
                 </TableRow>
-              ))}
+              ) : (
+                patients.map((patient) => (
+                  <TableRow key={patient.patient_id}>
+                    <TableCell className="font-medium">
+                      {patient.patient_id.slice(0, 8)}...
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                          <User className="h-4 w-4 text-primary" />
+                        </div>
+                        {patient.profiles.name}
+                      </div>
+                    </TableCell>
+                    <TableCell>{calculateAge(patient.dob)}</TableCell>
+                    <TableCell className="capitalize">{patient.gender}</TableCell>
+                    <TableCell>{patient.phone || "N/A"}</TableCell>
+                    <TableCell>{new Date(patient.dob).toLocaleDateString()}</TableCell>
+                    <TableCell>
+                      <button className="text-sm text-primary hover:underline">View</button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>
